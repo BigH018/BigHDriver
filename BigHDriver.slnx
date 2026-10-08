@@ -1,0 +1,11 @@
+<Solution>
+  <Configurations>
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Project Path="KMDriver/KMDriver.vcxproj">
+    <Platform Project="x64" />
+    <Deploy />
+  </Project>
+  <Project Path="UserModeApp/UserModeApp.vcxproj" Id="c69515eb-75a1-4ad3-9600-72bb5ece680a" />
+</Solution>

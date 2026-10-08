@@ -1,0 +1,62 @@
+;
+; KMDriver.inf
+;
+
+[Version]
+Signature   = "$WINDOWS NT$"
+Class       = System ; TODO: specify appropriate Class
+ClassGuid   = {4d36e97d-e325-11ce-bfc1-08002be10318} ; TODO: specify appropriate ClassGuid
+Provider    = %ManufacturerName%
+CatalogFile = KMDriver.cat
+DriverVer   = ; TODO: set DriverVer in stampinf property pages
+PnpLockdown = 1
+
+[DestinationDirs]
+DefaultDestDir = 13
+
+[SourceDisksNames]
+1 = %DiskName%,,,""
+
+[SourceDisksFiles]
+KMDriver.sys = 1,,
+
+;*****************************************
+; Install Section
+;*****************************************
+
+[Manufacturer]
+%ManufacturerName% = Standard,NT$ARCH$.10.0...16299 ; %13% support introduced in build 16299
+
+[Standard.NT$ARCH$.10.0...16299]
+%KMDriver.DeviceDesc% = KMDriver_Device, Root\KMDriver ; TODO: edit hw-id
+
+[KMDriver_Device.NT]
+CopyFiles = File_Copy
+
+[File_Copy]
+KMDriver.sys
+
+;-------------- Service installation
+[KMDriver_Device.NT.Services]
+AddService = KMDriver,%SPSVCINST_ASSOCSERVICE%, KMDriver_Service_Inst
+
+; -------------- KMDriver driver install sections
+[KMDriver_Service_Inst]
+DisplayName    = %KMDriver.SVCDESC%
+ServiceType    = 1               ; SERVICE_KERNEL_DRIVER
+StartType      = 3               ; SERVICE_DEMAND_START
+ErrorControl   = 1               ; SERVICE_ERROR_NORMAL
+ServiceBinary  = %13%\KMDriver.sys
+
+[KMDriver_Device.NT.Wdf]
+KmdfService = KMDriver, KMDriver_wdfsect
+
+[KMDriver_wdfsect]
+KmdfLibraryVersion = $KMDFVERSION$
+
+[Strings]
+SPSVCINST_ASSOCSERVICE = 0x00000002
+ManufacturerName = "<Your manufacturer name>" ;TODO: Replace with your manufacturer name
+DiskName = "KMDriver Installation Disk"
+KMDriver.DeviceDesc = "KMDriver Device"
+KMDriver.SVCDESC = "KMDriver Service"
