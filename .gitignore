@@ -54,3 +54,5 @@ desktop.ini
 # Logs / temp
 *.log
 *.tmp
+/KMDriver/KMDriver.vcxproj
+/KMDriver/KMDriver.vcxproj.filters
