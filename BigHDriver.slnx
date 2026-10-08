@@ -3,7 +3,7 @@
     <Platform Name="x64" />
     <Platform Name="x86" />
   </Configurations>
-  <Project Path="KMDriver/KMDriver.vcxproj">
+  <Project Path="BigHDriver/KMDriver.vcxproj">
     <Platform Project="x64" />
     <Deploy />
   </Project>
