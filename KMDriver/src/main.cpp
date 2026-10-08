@@ -19,7 +19,7 @@ extern "C" {
         SIZE_T BufferSize, KPROCESSOR_MODE PreviousMode,
         PSIZE_T ReturnSize
     );
-    NTKERNELAPI NTSTATUS PsLookupProcessByProcessId(HANDLE ProcessId, PEPROCESS* Process);
+    // NOTE: PsLookupProcessByProcessId is ALREADY declared in ntifs.h. Do NOT redeclare it here.
     NTKERNELAPI PPEB PsGetProcessPeb(PEPROCESS Process);
 
     NTKERNELAPI NTSTATUS ZwQuerySystemInformation(
@@ -31,10 +31,8 @@ extern "C" {
 }
 
 // ============================================================================
-// UNDOCUMENTED STRUCTURES (Required because WDK hides them)
+// UNDOCUMENTED STRUCTURES
 // ============================================================================
-
-// 1. Process Environment Block (PEB)
 typedef struct _PEB {
     BYTE InheritedAddressSpace;
     BYTE ReadImageFileExecOptions;
@@ -42,11 +40,10 @@ typedef struct _PEB {
     BYTE BitField;
     PVOID Mutant;
     PVOID ImageBaseAddress;
-    PVOID Ldr; // Points to PEB_LDR_DATA
+    PVOID Ldr;
     PVOID ProcessParameters;
 } PEB, * PPEB;
 
-// 2. PEB Loader Data (Contains the module linked lists)
 typedef struct _PEB_LDR_DATA {
     ULONG Length;
     BOOLEAN Initialized;
@@ -56,7 +53,6 @@ typedef struct _PEB_LDR_DATA {
     LIST_ENTRY InInitializationOrderModuleList;
 } PEB_LDR_DATA, * PPEB_LDR_DATA;
 
-// 3. Loader Data Table Entry (Represents a single loaded module like client.dll)
 typedef struct _LDR_DATA_TABLE_ENTRY {
     LIST_ENTRY InLoadOrderLinks;
     LIST_ENTRY InMemoryOrderLinks;
@@ -68,9 +64,6 @@ typedef struct _LDR_DATA_TABLE_ENTRY {
     UNICODE_STRING BaseDllName;
 } LDR_DATA_TABLE_ENTRY, * PLDR_DATA_TABLE_ENTRY;
 
-// ============================================================================
-// SYSTEM PROCESS INFORMATION (For GET_PID)
-// ============================================================================
 typedef struct _SYSTEM_PROCESS_INFORMATION {
     ULONG NextEntryOffset;
     ULONG NumberOfThreads;
@@ -129,6 +122,7 @@ struct info_t {
     wchar_t process_name[256] = { 0 };
     wchar_t module_name[256] = { 0 };
     void* module_base = 0x0;
+    SIZE_T module_size = 0; // NEW: Size of the module in bytes
 };
 
 PEPROCESS g_TargetProcess = NULL;
@@ -164,7 +158,7 @@ NTSTATUS GetProcessIdByName(const wchar_t* process_name, HANDLE* pid) {
     return STATUS_NOT_FOUND;
 }
 
-NTSTATUS GetModuleBaseByName(HANDLE pid, const wchar_t* module_name, PVOID* base) {
+NTSTATUS GetModuleBaseByName(HANDLE pid, const wchar_t* module_name, PVOID* base, SIZE_T* size) {
     PEPROCESS process = NULL;
     NTSTATUS status = PsLookupProcessByProcessId(pid, &process);
     if (!NT_SUCCESS(status)) return status;
@@ -181,8 +175,9 @@ NTSTATUS GetModuleBaseByName(HANDLE pid, const wchar_t* module_name, PVOID* base
         while (current != list_head) {
             PLDR_DATA_TABLE_ENTRY entry = CONTAINING_RECORD(current, LDR_DATA_TABLE_ENTRY, InLoadOrderLinks);
             if (entry->BaseDllName.Buffer) {
-                if (wcsstr(entry->BaseDllName.Buffer, module_name) != NULL) {
+                if (_wcsicmp(entry->BaseDllName.Buffer, module_name) == 0) {
                     *base = entry->DllBase;
+                    *size = entry->SizeOfImage; // Fill in the module size
                     KeUnstackDetachProcess(&apc_state);
                     ObDereferenceObject(process);
                     return STATUS_SUCCESS;
@@ -230,8 +225,8 @@ NTSTATUS ctl_io(PDEVICE_OBJECT device_obj, PIRP irp) {
         }
         else if (ctl_code == get_module_code) {
             DbgPrint("[KMDriver] Received GET_MODULE request for: %ws\n", (PWCHAR)buffer->module_name);
-            status = GetModuleBaseByName(buffer->target_pid, buffer->module_name, &buffer->module_base);
-            if (NT_SUCCESS(status)) DbgPrint("[KMDriver] Found module base: 0x%p\n", buffer->module_base);
+            status = GetModuleBaseByName(buffer->target_pid, buffer->module_name, &buffer->module_base, &buffer->module_size);
+            if (NT_SUCCESS(status)) DbgPrint("[KMDriver] Found module base: 0x%p size: 0x%X\n", buffer->module_base, (ULONG)buffer->module_size);
         }
         else if (ctl_code == read_code || ctl_code == write_code) {
             if (buffer->size == 0 || buffer->size > 0x10000000) { status = STATUS_INVALID_BUFFER_SIZE; goto complete; }
